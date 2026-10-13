@@ -44,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   async function refreshOne(config: SshHostConfig): Promise<void> {
-    provider.updateServer({ config, kind: 'loading', gpus: [] });
+    provider.startRefresh(config);
 
     let result;
     try {
@@ -112,12 +112,12 @@ export function activate(context: vscode.ExtensionContext) {
     treeView,
 
     vscode.commands.registerCommand('gpuMonitor.refresh', () => {
-      refreshAll();
+      return refreshAll();
     }),
 
     vscode.commands.registerCommand('gpuMonitor.refreshServer', (item: ServerItem) => {
       if (item?.status?.config) {
-        refreshOne(item.status.config);
+        return refreshOne(item.status.config);
       }
     }),
 
@@ -126,7 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.status?.config) { return; }
       const ok = await promptPassword(item.status.config, context.secrets);
       if (ok) {
-        refreshOne(item.status.config);
+        return refreshOne(item.status.config);
       }
     }),
 
@@ -144,8 +144,10 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.workspace.onDidChangeConfiguration(e => {
-      if (e.affectsConfiguration('gpuMonitor')) {
+      if (e.affectsConfiguration('gpuMonitor.servers') || e.affectsConfiguration('gpuMonitor.excludedServers')) {
         reinitialize();
+      } else if (e.affectsConfiguration('gpuMonitor.refreshInterval')) {
+        resetAutoRefresh();
       }
     }),
 

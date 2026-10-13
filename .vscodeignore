@@ -4,5 +4,7 @@ install.sh
 install.ps1
 src/
 tsconfig.json
-node_modules/
+tests/
+.vscode/
+LOCAL-DEVELOPMENT.md
 *.vsix

@@ -1,23 +1,28 @@
 import * as vscode from 'vscode';
-import { ServerStatus, GpuInfo, ProcessInfo } from './types';
+import { ServerStatus, SshHostConfig, GpuInfo, ProcessInfo } from './types';
 
 // ---------------------------------------------------------------------------
 // Tree item types
 // ---------------------------------------------------------------------------
 
 export class ServerItem extends vscode.TreeItem {
-  constructor(public readonly status: ServerStatus) {
+  constructor(public status: ServerStatus) {
+    super(status.config.host);
+    this.id = JSON.stringify(['server', status.config.host]);
+    this.update(status);
+  }
+
+  update(status: ServerStatus) {
+    this.status = status;
     const noChildren = status.kind === 'error'
       || status.kind === 'no-gpu'
       || status.kind === 'needs-auth'
       || status.kind === 'idle';
 
-    super(
-      status.config.host,
-      noChildren
-        ? vscode.TreeItemCollapsibleState.None
-        : vscode.TreeItemCollapsibleState.Expanded
-    );
+    this.collapsibleState = noChildren
+      ? vscode.TreeItemCollapsibleState.None
+      : vscode.TreeItemCollapsibleState.Expanded;
+    this.command = undefined;
 
     // contextValue drives right-click menu visibility
     this.contextValue = status.kind === 'needs-auth'
@@ -105,7 +110,7 @@ export class ServerItem extends vscode.TreeItem {
 }
 
 export class GpuItem extends vscode.TreeItem {
-  constructor(public readonly gpu: GpuInfo) {
+  constructor(public readonly gpu: GpuInfo, public readonly host: string) {
     super(
       `GPU ${gpu.index}  ${gpu.name}`,
       gpu.processes.length > 0
@@ -113,6 +118,7 @@ export class GpuItem extends vscode.TreeItem {
         : vscode.TreeItemCollapsibleState.None
     );
 
+    this.id = JSON.stringify(['gpu', host, gpu.index]);
     this.contextValue = 'gpu';
 
     const memPct = gpu.memTotalMiB > 0
@@ -150,8 +156,9 @@ export class GpuItem extends vscode.TreeItem {
 }
 
 export class ProcessItem extends vscode.TreeItem {
-  constructor(public readonly proc: ProcessInfo) {
+  constructor(public readonly proc: ProcessInfo, host: string, gpuIndex: number) {
     super(proc.processName, vscode.TreeItemCollapsibleState.None);
+    this.id = JSON.stringify(['process', host, gpuIndex, proc.pid]);
     const memGB = (proc.memUsedMiB / 1024).toFixed(1);
     this.contextValue = 'gpu-process';
     this.description = `${memGB} GB  PID ${proc.pid}`;
@@ -182,7 +189,7 @@ export class GpuMonitorTreeProvider implements vscode.TreeDataProvider<AnyItem> 
 
   // Ordered list of server hosts, so display order is stable
   private _order: string[] = [];
-  private _map = new Map<string, ServerStatus>();
+  private _map = new Map<string, ServerItem>();
 
   // ----- Mutation -----
 
@@ -190,17 +197,27 @@ export class GpuMonitorTreeProvider implements vscode.TreeDataProvider<AnyItem> 
     this._order = statuses.map(s => s.config.host);
     this._map.clear();
     for (const s of statuses) {
-      this._map.set(s.config.host, s);
+      this._map.set(s.config.host, new ServerItem(s));
     }
     this._onChange.fire();
   }
 
+  startRefresh(config: SshHostConfig) {
+    // Keep the last successful snapshot visible during background polling.
+    if (this._map.get(config.host)?.status.kind === 'online') { return; }
+    this.updateServer({ config, kind: 'loading', gpus: [] });
+  }
+
   updateServer(status: ServerStatus) {
-    if (!this._map.has(status.config.host)) {
+    const item = this._map.get(status.config.host);
+    if (!item) {
       this._order.push(status.config.host);
+      this._map.set(status.config.host, new ServerItem(status));
+      this._onChange.fire();
+      return;
     }
-    this._map.set(status.config.host, status);
-    this._onChange.fire();
+    item.update(status);
+    this._onChange.fire(item);
   }
 
   // ----- TreeDataProvider -----
@@ -217,8 +234,7 @@ export class GpuMonitorTreeProvider implements vscode.TreeDataProvider<AnyItem> 
       }
       return this._order
         .map(h => this._map.get(h))
-        .filter((s): s is ServerStatus => s !== undefined)
-        .map(s => new ServerItem(s));
+        .filter((s): s is ServerItem => s !== undefined);
     }
 
     // Server children
@@ -230,13 +246,13 @@ export class GpuMonitorTreeProvider implements vscode.TreeDataProvider<AnyItem> 
       if (kind === 'needs-auth') { return []; }
       if (kind === 'idle')       { return []; }
       if (gpus.length === 0) { return [new MessageItem('No GPUs reported by nvidia-smi')]; }
-      return gpus.map(g => new GpuItem(g));
+      return gpus.map(g => new GpuItem(g, el.status.config.host));
     }
 
     // GPU children
     if (el instanceof GpuItem) {
       if (el.gpu.processes.length === 0) { return []; }
-      return el.gpu.processes.map(p => new ProcessItem(p));
+      return el.gpu.processes.map(p => new ProcessItem(p, el.host, el.gpu.index));
     }
 
     return [];
