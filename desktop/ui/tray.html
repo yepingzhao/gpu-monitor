@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>GPU Monitor — 快速查看</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="tray.css">
+  <script src="tray.js" defer></script>
+</head>
+<body class="tray-view">
+  <header><h1>GPU Monitor <span>快速查看</span></h1><button id="close-tray" aria-label="收起快速查看" title="收起（Esc）">×</button></header>
+  <section class="quick-toolbar" aria-label="监控概况"><p id="quick-overview" role="status">正在读取状态…</p><button id="quick-refresh">刷新</button></section>
+  <main id="quick-servers" aria-label="服务器速览"></main>
+  <p id="quick-error" class="error" role="alert" hidden></p>
+  <footer><button id="open-main" class="primary">打开主窗口</button><button id="open-settings">设置</button></footer>
+</body>
+</html>

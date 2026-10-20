@@ -1,0 +1,43 @@
+{
+  "name": "gpu-monitor-desktop",
+  "productName": "GPU Monitor",
+  "version": "0.1.0",
+  "description": "SSH GPU monitor for the Windows system tray",
+  "author": "yepingzhao",
+  "license": "MIT",
+  "main": "build/desktop/main.js",
+  "scripts": {
+    "compile": "tsc -p .",
+    "start": "npm run compile && electron .",
+    "test": "npm run compile && node test/run.cjs",
+    "dist": "npm run compile && electron-builder --win nsis",
+    "dist:portable": "npm run compile && electron-builder --win portable",
+    "pack": "npm run compile && electron-builder --win --dir"
+  },
+  "dependencies": { "ssh2": "^1.16.0" },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ssh2": "^1.15.0",
+    "electron": "44.9.1",
+    "electron-builder": "26.15.3",
+    "typescript": "^5.3.0"
+  },
+  "build": {
+    "appId": "io.github.yepingzhao.gpu-monitor",
+    "directories": { "output": "dist" },
+    "files": ["build/**/*", "ui/**/*", "assets/**/*", "package.json"],
+    "npmRebuild": false,
+    "win": { "target": "nsis", "icon": "assets/icon.ico", "signExecutable": false },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GPU Monitor",
+      "installerLanguages": ["zh_CN", "en_US"],
+      "artifactName": "GPU-Monitor-Setup-${version}-${arch}.${ext}"
+    },
+    "artifactName": "GPU-Monitor-${version}-${arch}.${ext}"
+  }
+}
